@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import io
 import json
 import os
@@ -14,27 +14,61 @@ import torch
 import torch.nn as nn
 
 from .model_partition import plan_model
+from .history_store import (
+    save_job, load_latest_job, archive_checkpoint
+)
+from datetime import datetime, timezone
+import re
+
+EPOCH_RE = re.compile(
+    r"^Epoch\s+(\d+)/(\d+)\s+\|\s+MSE:\s+([0-9.eE+-]+)"
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 lock = threading.Lock()
-job = {"status": "idle", "logs": []}
+job = load_latest_job() or {"status": "idle", "logs": []}
+
+if job.get("status") == "running":
+    job["status"] = "interrupted"
+    job["error"] = "Controller restarted during training"
+    job.setdefault("logs", []).append(
+        "Training interrupted. Restart workers before a new job."
+    )
+    save_job(job)
 
 
 def update(**values):
     with lock:
         job.update(values)
+        save_job(job)
 
 
 def log(message):
     print("[DGPU]", message)
+
     with lock:
         job.setdefault("logs", []).append(str(message))
         job["logs"] = job["logs"][-100:]
 
+        match = EPOCH_RE.match(str(message))
+
+        if match:
+            job.setdefault("history", []).append({
+                "epoch": int(match.group(1)),
+                "total_epochs": int(match.group(2)),
+                "mse": float(match.group(3))
+            })
+
+        save_job(job)
+
 
 def get_status():
     with lock:
-        return dict(job, logs=list(job.get("logs", [])))
+        return dict(
+            job,
+            logs=list(job.get("logs", [])),
+            history=list(job.get("history", []))
+        )
 
 
 def safe_file(folder, filename, suffix):
@@ -344,8 +378,19 @@ def train(config):
             )
 
         final = merge_stages(stages, blocks)
+
+        archived = archive_checkpoint(
+            final, get_status()["job_id"]
+        )
+
         log("Merged checkpoint: " + str(final))
-        update(status="completed", output=str(final))
+        log("Archived checkpoint: " + str(archived))
+
+        update(
+            status="completed",
+            output=str(final),
+            archived_output=str(archived)
+        )
 
     except Exception as error:
         log("ERROR: " + str(error))
@@ -369,12 +414,17 @@ def start_training(config):
 
         job.clear()
         job.update({
+            "job_id": uuid.uuid4().hex[:12],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "config": dict(config),
             "status": "running",
             "logs": [],
+            "history": [],
             "epoch": 0,
             "loss": None,
             "stages": []
         })
+        save_job(job)
 
     threading.Thread(
         target=train,

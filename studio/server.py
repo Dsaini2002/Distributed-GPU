@@ -1,4 +1,4 @@
-﻿import os
+import os
 import time
 import hmac
 import threading
@@ -237,3 +237,13 @@ app.include_router(studio_training_router)
 
 from .upload_ui import router as studio_upload_router
 app.include_router(studio_upload_router)
+
+from .monitor_api import router as studio_monitor_api_router
+from .monitor_ui import router as studio_monitor_ui_router
+
+app.include_router(studio_monitor_api_router)
+app.include_router(studio_monitor_ui_router)
+
+
+from .history_ui import router as studio_history_router
+app.include_router(studio_history_router)

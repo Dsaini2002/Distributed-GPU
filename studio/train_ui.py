@@ -1,4 +1,4 @@
-﻿import os
+import os
 import hmac
 
 from fastapi import APIRouter, Header, HTTPException
@@ -89,7 +89,7 @@ small {color:#a9bdd4}
 <body>
 <main>
 <a href="/" style="color:#7dbaff">Cluster Dashboard</a>
-<h1>Distributed-GPU Training Studio</h1><p><a href="/upload">Upload Model or Dataset</a></p>
+<h1>Distributed-GPU Training Studio</h1><p><a href="/history">Job History</a></p><p><a href="/monitor">Live Training Monitor + Model Download</a></p><p><a href="/upload">Upload Model or Dataset</a></p>
 <p>Automatic N-GPU model-parallel regression training</p>
 
 <div class="card">
@@ -209,4 +209,5 @@ setInterval(refresh, 2000);
 </body>
 </html>
 """
+
 
