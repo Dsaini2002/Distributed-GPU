@@ -1,0 +1,4 @@
+checkpoints/
+outputs/
+data/*.csv.dgpu/
+studio/__pycache__/
