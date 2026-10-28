@@ -234,3 +234,6 @@ from .train_ui import router as studio_training_router
 app.include_router(studio_training_router)
 
 
+
+from .upload_ui import router as studio_upload_router
+app.include_router(studio_upload_router)
