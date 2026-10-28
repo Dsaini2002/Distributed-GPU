@@ -247,3 +247,7 @@ app.include_router(studio_monitor_ui_router)
 
 from .history_ui import router as studio_history_router
 app.include_router(studio_history_router)
+
+
+from .resume_api import router as studio_resume_router
+app.include_router(studio_resume_router)

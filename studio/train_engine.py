@@ -14,7 +14,11 @@ import torch
 import torch.nn as nn
 
 from .model_partition import plan_model
+from .recovery import (
+    save_epoch, latest_checkpoint, restore_stage
+)
 from .history_store import (
+    load_job,
     save_job, load_latest_job, archive_checkpoint
 )
 from datetime import datetime, timezone
@@ -259,7 +263,7 @@ def merge_stages(stages, blocks):
     return final
 
 
-def train(config):
+def train(config, resume_state=None):
     configured = []
 
     try:
@@ -275,11 +279,54 @@ def train(config):
         blocks = get_blocks(model_path)
         rows = read_data(data_path, blocks[0]["in"])
 
-        stages = plan_model(
-            blocks,
-            snapshot(),
-            config["batch_size"]
-        )
+        if resume_state is None:
+            stages = plan_model(
+                blocks,
+                snapshot(),
+                config["batch_size"]
+            )
+            first_epoch = 0
+        else:
+            if blocks != resume_state["blocks"]:
+                raise ValueError(
+                    "Model architecture changed since checkpoint"
+                )
+
+            stages = [
+                dict(s) for s in resume_state["stages"]
+            ]
+            first_epoch = resume_state["epoch"]
+
+            active_nodes = snapshot()
+
+            for stage in stages:
+                matching = any(
+                    n["online"]
+                    and n["hostname"] == stage["hostname"]
+                    and n.get("address") == stage["address"]
+                    and any(
+                        g["index"] == stage["gpu_index"]
+                        and g["name"] == stage["gpu"]
+                        for g in n["gpus"]
+                    )
+                    for n in active_nodes
+                )
+
+                if not matching:
+                    raise ValueError(
+                        "Original worker unavailable: "
+                        + stage["hostname"]
+                    )
+
+            # Single-job prototype: clear stale model stages.
+            cleared = set()
+
+            for stage in stages:
+                if stage["address"] in cleared:
+                    continue
+
+                request_worker(stage, "clear", {})
+                cleared.add(stage["address"])
 
         run_id = uuid.uuid4().hex[:12]
 
@@ -301,7 +348,7 @@ def train(config):
             f"using {len(stages)} GPU stages"
         )
 
-        for stage in stages:
+        for index, stage in enumerate(stages):
             request_worker(stage, "configure", {
                 "stage_id": stage["stage_id"],
                 "gpu_index": stage["gpu_index"],
@@ -311,6 +358,14 @@ def train(config):
 
             configured.append(stage)
 
+            if resume_state is not None:
+                restore_stage(
+                    stage,
+                    resume_state,
+                    index,
+                    os.environ["DGPU_TOKEN"]
+                )
+
             log(
                 f"{stage['hostname']} / {stage['gpu']} "
                 f"= {len(stage['blocks'])} layers"
@@ -318,7 +373,7 @@ def train(config):
 
         batch_size = config["batch_size"]
 
-        for epoch in range(config["epochs"]):
+        for epoch in range(first_epoch, config["epochs"]):
             indices = list(range(len(rows)))
             random.Random(42 + epoch).shuffle(indices)
 
@@ -377,6 +432,19 @@ def train(config):
                 f"| MSE: {average:.6f}"
             )
 
+            saved_dir = save_epoch(
+                get_status()["job_id"],
+                epoch + 1,
+                stages,
+                blocks,
+                request_worker
+            )
+
+            log(
+                "Recovery checkpoint saved: "
+                + str(saved_dir)
+            )
+
         final = merge_stages(stages, blocks)
 
         archived = archive_checkpoint(
@@ -433,3 +501,69 @@ def start_training(config):
     ).start()
 
     return {"status": "running"}
+
+
+
+def resume_training(job_id):
+    checkpoint = latest_checkpoint(job_id)
+
+    if checkpoint is None:
+        raise ValueError(
+            "No valid recovery checkpoint for this job"
+        )
+
+    saved = load_job(job_id)
+
+    if saved is None:
+        raise ValueError("Job not found")
+
+    if saved.get("status") not in ("failed", "interrupted"):
+        raise ValueError(
+            "Only failed or interrupted jobs can resume"
+        )
+
+    config = saved.get("config")
+
+    if not config:
+        raise ValueError("Training configuration missing")
+
+    with lock:
+        if job.get("status") == "running":
+            raise ValueError("Another training job is running")
+
+        job.clear()
+        job.update(saved)
+
+        completed = checkpoint["epoch"]
+
+        job["status"] = "running"
+        job["error"] = None
+        job["epoch"] = completed
+
+        job["history"] = [
+            item for item in job.get("history", [])
+            if item["epoch"] <= completed
+        ]
+
+        history = job["history"]
+        job["loss"] = (
+            history[-1]["mse"] if history else None
+        )
+
+        job.setdefault("logs", []).append(
+            f"Resume requested from epoch {completed}"
+        )
+
+        save_job(job)
+
+    threading.Thread(
+        target=train,
+        args=(dict(config), checkpoint),
+        daemon=True
+    ).start()
+
+    return {
+        "status": "running",
+        "job_id": job_id,
+        "resumed_from_epoch": completed
+    }

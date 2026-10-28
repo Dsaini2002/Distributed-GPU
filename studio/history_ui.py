@@ -1,4 +1,4 @@
-﻿import hmac
+import hmac
 import os
 
 from pathlib import Path
@@ -157,6 +157,9 @@ small {color:#afc0d6}
   <button id="download" onclick="downloadModel()" disabled>
     Download Archived Model
   </button>
+  <button onclick="resumeSelectedJob()">
+    Resume Interrupted Job
+  </button>
   <h3>Training Logs</h3>
   <pre id="logs">No job selected.</pre>
 </div>
@@ -306,6 +309,35 @@ async function downloadModel() {
   a.remove();
 
   setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+async function resumeSelectedJob() {
+  if (!activeJob) {
+    alert("Select a job first");
+    return;
+  }
+
+  const response = await fetch(
+    "/api/studio/jobs/" + activeJob + "/resume",
+    {
+      method: "POST",
+      headers: headers()
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(JSON.stringify(result));
+    return;
+  }
+
+  alert(
+    "Resuming from epoch " +
+    result.resumed_from_epoch
+  );
+
+  location.href = "/monitor";
 }
 </script>
 </body>

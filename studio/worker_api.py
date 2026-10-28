@@ -1,11 +1,11 @@
-﻿import io
+import io
 import os
 import hmac
 import threading
 
 import torch
 import torch.nn as nn
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response
 
 app = FastAPI(title="DGPU GPU Worker")
@@ -151,5 +151,85 @@ def reset(p: dict, authorization: str = Header(default="")):
 
     with lock:
         stages.pop(p["stage_id"], None)
+
+    return {"ok": True}
+
+
+@app.post("/snapshot")
+def snapshot_stage(
+    p: dict,
+    authorization: str = Header(default="")
+):
+    authorize(authorization)
+
+    with lock:
+        stage = stages.get(p.get("stage_id"))
+
+        if stage is None:
+            raise HTTPException(404, "Stage missing")
+
+        if stage["y"] is not None:
+            raise HTTPException(409, "Backward incomplete")
+
+        buffer = io.BytesIO()
+
+        torch.save({
+            "model": stage["model"].state_dict(),
+            "optimizer": stage["optimizer"].state_dict()
+        }, buffer)
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/octet-stream"
+        )
+
+
+@app.post("/restore")
+async def restore_stage(
+    request: Request,
+    x_stage_id: str = Header(default=""),
+    authorization: str = Header(default="")
+):
+    authorize(authorization)
+
+    raw = await request.body()
+
+    if not raw:
+        raise HTTPException(400, "Empty snapshot")
+
+    with lock:
+        stage = stages.get(x_stage_id)
+
+        if stage is None:
+            raise HTTPException(404, "Stage missing")
+
+        if stage["y"] is not None:
+            raise HTTPException(409, "Stage is busy")
+
+        data = torch.load(
+            io.BytesIO(raw),
+            map_location="cpu",
+            weights_only=True
+        )
+
+        stage["model"].load_state_dict(
+            data["model"], strict=True
+        )
+
+        stage["optimizer"].load_state_dict(
+            data["optimizer"]
+        )
+
+        return {"ok": True}
+
+
+@app.post("/clear")
+def clear_stages(
+    authorization: str = Header(default="")
+):
+    authorize(authorization)
+
+    with lock:
+        stages.clear()
 
     return {"ok": True}
