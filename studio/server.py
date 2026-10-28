@@ -3,7 +3,7 @@ import time
 import hmac
 import threading
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,7 @@ class Node(BaseModel):
 
 @app.post("/api/heartbeat")
 def heartbeat(
+    request: Request,
     node: Node,
     authorization: str = Header(default="")
 ):
@@ -44,6 +45,7 @@ def heartbeat(
 
     with lock:
         registry[node.node_id] = {
+            "address": request.client.host,
             **node.model_dump(),
             "last_seen": time.time()
         }
@@ -225,5 +227,10 @@ setInterval(refresh, 3000);
 </body>
 </html>
 """
+
+
+
+from .train_ui import router as studio_training_router
+app.include_router(studio_training_router)
 
 
