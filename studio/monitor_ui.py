@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 router = APIRouter()
@@ -77,7 +77,7 @@ progress {width:100%;height:19px}
 
 <div class="card">
   <h2>Live Training Loss</h2>
-  <small>Logarithmic scale — updates every 2 seconds</small>
+  <small>Logarithmic scale â€” updates every 2 seconds</small>
   <svg id="plot" viewBox="0 0 800 260"
        preserveAspectRatio="none"></svg>
   <p id="graphInfo">No epoch data yet.</p>
@@ -90,7 +90,7 @@ progress {width:100%;height:19px}
 
 <div class="card">
   <h2>Automatic Stage Allocation</h2>
-  <div id="stages">No job running.</div>
+  <div id="stages">No job running.</div><p id="offlineWarning" style="color:#ffb86c"></p>
 </div>
 
 <div class="card">
@@ -207,6 +207,11 @@ async function refresh() {
       throw new Error("Server request failed");
 
     const job=await jobResponse.json();
+const offline=job.offline_workers || [];
+document.getElementById("offlineWarning").textContent =
+  offline.length
+  ? "WARNING: Offline GPU workers: " + offline.join(", ")
+  : "";
     const cluster=await nodesResponse.json();
     const history=job.history || [];
     const last=history[history.length-1];
@@ -370,3 +375,4 @@ setInterval(refresh,2000);
 </body>
 </html>
 """
+

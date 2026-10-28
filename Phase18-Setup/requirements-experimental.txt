@@ -1,0 +1,6 @@
+# Optional pretrained language-model fine-tuning (uses downloads)
+transformers
+peft
+accelerate
+# Optional object detection YOLO (uses pretrained weight downloads)
+ultralytics

@@ -16,16 +16,25 @@ HOSTNAME = socket.gethostname()
 MAGIC = "DISTRIBUTED_GPU_V1"
 
 
+
 def get_network_interfaces():
     command = [
         "powershell",
         "-NoProfile",
         "-Command",
         (
-            "Get-NetIPAddress -AddressFamily IPv4 | "
-            "Where-Object { $_.IPAddress -notlike '127.*' "
-            "-and $_.PrefixLength -ge 1 "
-            "-and $_.PrefixLength -le 30 } | "
+            "Get-NetAdapter | "
+            "Where-Object { $_.Status -eq 'Up' } | "
+            "ForEach-Object { "
+            "Get-NetIPAddress -InterfaceIndex $_.ifIndex "
+            "-AddressFamily IPv4 -ErrorAction SilentlyContinue "
+            "} | "
+            "Where-Object { "
+            "$_.IPAddress -notlike '127.*' -and "
+            "$_.IPAddress -notlike '169.254.*' -and "
+            "$_.PrefixLength -ge 1 -and "
+            "$_.PrefixLength -le 30 "
+            "} | "
             "Select-Object IPAddress,PrefixLength | "
             "ConvertTo-Json -Compress"
         )

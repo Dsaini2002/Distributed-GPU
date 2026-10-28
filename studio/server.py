@@ -255,3 +255,8 @@ app.include_router(studio_resume_router)
 
 from .session_auth import install as install_session_auth
 install_session_auth(app)
+
+# DGPU_MODEL_ZOO_BEGIN
+from studio_zoo.api import router as _dgpu_zoo_router
+app.include_router(_dgpu_zoo_router)
+# DGPU_MODEL_ZOO_END

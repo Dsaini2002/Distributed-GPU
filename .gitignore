@@ -2,3 +2,31 @@ checkpoints/
 outputs/
 data/*.csv.dgpu/
 studio/__pycache__/
+
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets and local configurations
+.env
+.env.*
+!.env.example
+.dgpu/
+worker_config.json
+
+# Model checkpoints and generated files
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.log
+*.zip
+
+# Private user uploads
+uploads/
+data/private/
+

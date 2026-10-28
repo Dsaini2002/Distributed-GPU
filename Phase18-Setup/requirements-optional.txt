@@ -1,0 +1,4 @@
+# Install matching torchvision build for your existing torch+CUDA version.
+torchvision
+# For image datasets, torchvision generally provides Pillow as a dependency.
+Pillow
