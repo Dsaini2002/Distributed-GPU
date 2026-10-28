@@ -138,15 +138,15 @@ small {color:#afc0d6}
 <h1>Distributed-GPU Training History</h1>
 
 <div class="card">
-  <label>Cluster token</label>
-  <input id="token" type="password" autocomplete="off">
+  <label>Authenticated with your login session</label>
+  <input id="token" type="hidden" value="">
   <button onclick="loadJobs()">Load History</button>
   <p><small>Token stays in this page only.</small></p>
 </div>
 
 <div class="card">
   <h2>Training Jobs</h2>
-  <div id="jobs">Enter token and load history.</div>
+  <div id="jobs">Click Load History.</div>
 </div>
 
 <div class="card">

@@ -108,8 +108,8 @@ small {color:#a9bdd4}
   <label>Learning Rate
     <input id="lr" type="number" value="0.001" step="0.001">
   </label>
-  <label>Cluster authentication token
-    <input id="token" type="password" autocomplete="off">
+  <label>Authenticated with your login session
+    <input id="token" type="hidden" value="">
   </label>
   <button onclick="startTraining()">Start Training</button>
   <p><small>Supports trusted nn.Sequential Linear/ReLU

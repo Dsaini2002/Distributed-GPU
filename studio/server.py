@@ -251,3 +251,7 @@ app.include_router(studio_history_router)
 
 from .resume_api import router as studio_resume_router
 app.include_router(studio_resume_router)
+
+
+from .session_auth import install as install_session_auth
+install_session_auth(app)

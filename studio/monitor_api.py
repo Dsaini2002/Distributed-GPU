@@ -49,6 +49,21 @@ def history_from_logs(logs):
 
 def trained_model_path():
     status = get_status()
+
+    from .server import snapshot
+    online_names = {
+        n["hostname"] for n in snapshot()
+        if n["online"]
+    }
+
+    offline_workers = []
+
+    if status.get("status") == "running":
+        offline_workers = sorted(set(
+            stage["computer"]
+            for stage in status.get("stages", [])
+            if stage["computer"] not in online_names
+        ))
     state = status.get("status")
 
     if state == "running":
@@ -98,7 +113,8 @@ def monitor():
         "logs": status.get("logs", []),
         "history": history,
         "output": status.get("output"),
-        "error": status.get("error")
+        "error": status.get("error"),
+        "offline_workers": offline_workers
     }
 
 

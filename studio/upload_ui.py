@@ -1,4 +1,4 @@
-﻿import hmac
+import hmac
 import os
 import re
 import uuid
@@ -166,7 +166,7 @@ small {color:#b1c2d8}
     <input type="file" id="file" accept=".py">
   </label>
 
-  <label>Cluster Authentication Token
+  <label>Authenticated with your login session
     <input type="password" id="token" autocomplete="off">
   </label>
 

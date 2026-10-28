@@ -104,9 +104,8 @@ progress {width:100%;height:19px}
   <select id="valDataset"></select>
 
   <p>
-    <label>Cluster authentication token</label>
-    <input id="token" type="password"
-           autocomplete="off" placeholder="Shared token">
+    <label>Authenticated with your login session</label>
+    <input id="token" type="hidden" value="">
   </p>
 
   <button onclick="runEvaluation()">Evaluate Model</button>
