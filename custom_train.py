@@ -1,4 +1,5 @@
-
+import hashlib
+import os
 import argparse
 import csv
 import importlib.util
@@ -50,6 +51,104 @@ def receive(sock):
 
     return json.loads(read_exact(sock, size))
 
+
+CHUNK_SIZE = 1024 * 1024
+MAX_CHECKPOINT_SIZE = 8 * 1024 ** 3
+
+
+def file_hash(path):
+    sha = hashlib.sha256()
+
+    with open(path, "rb") as file:
+        while True:
+            chunk = file.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            sha.update(chunk)
+
+    return sha.hexdigest()
+
+
+def send_checkpoint(conn, path):
+    path = Path(path)
+    size = path.stat().st_size
+
+    if not 0 < size <= MAX_CHECKPOINT_SIZE:
+        raise ValueError("Invalid checkpoint file size")
+
+    digest = file_hash(path)
+
+    send(conn, {
+        "op": "checkpoint",
+        "size": size,
+        "sha256": digest
+    })
+
+    print(f"Sending checkpoint: {size} bytes")
+
+    with path.open("rb") as file:
+        while True:
+            chunk = file.read(CHUNK_SIZE)
+
+            if not chunk:
+                break
+
+            conn.sendall(chunk)
+
+    print("Checkpoint transmitted")
+
+
+def receive_checkpoint(conn, destination):
+    info = receive(conn)
+
+    if info.get("op") != "checkpoint":
+        raise ValueError("Expected checkpoint")
+
+    size = info.get("size")
+    expected_hash = info.get("sha256")
+
+    if type(size) is not int or not 0 < size <= MAX_CHECKPOINT_SIZE:
+        raise ValueError("Invalid checkpoint size")
+
+    if (
+        not isinstance(expected_hash, str)
+        or len(expected_hash) != 64
+        or any(c not in "0123456789abcdef" for c in expected_hash)
+    ):
+        raise ValueError("Invalid checkpoint hash")
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_file = destination.with_name(destination.name + ".part")
+    remaining = size
+    sha = hashlib.sha256()
+
+    try:
+        with temp_file.open("wb") as file:
+            while remaining > 0:
+                chunk = conn.recv(min(CHUNK_SIZE, remaining))
+
+                if not chunk:
+                    raise ConnectionError("Checkpoint transfer interrupted")
+
+                file.write(chunk)
+                sha.update(chunk)
+                remaining -= len(chunk)
+
+        if sha.hexdigest() != expected_hash:
+            raise ValueError("Checkpoint SHA-256 mismatch")
+
+        os.replace(temp_file, destination)
+
+    except Exception:
+        temp_file.unlink(missing_ok=True)
+        raise
+
+    print(f"Checkpoint received: {destination}")
+    print(f"Verified bytes: {size}")
+
+    return size
 
 def gpu_info():
     if not torch.cuda.is_available():
