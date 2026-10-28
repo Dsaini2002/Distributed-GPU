@@ -13,6 +13,23 @@ PORT = 45323
 STEPS = 60
 MAX_MESSAGE = 200_000
 
+def show_gpu_memory(label):
+    torch.cuda.synchronize()
+
+    mb = 1024 ** 2
+
+    allocated = torch.cuda.max_memory_allocated() / mb
+    reserved = torch.cuda.max_memory_reserved() / mb
+    free, total = torch.cuda.mem_get_info()
+
+    print(f"\n----- {label} GPU MEMORY -----")
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Total VRAM: {total / mb:.0f} MB")
+    print(f"Peak PyTorch allocated: {allocated:.2f} MB")
+    print(f"Peak PyTorch reserved: {reserved:.2f} MB")
+    print(f"Currently free: {free / mb:.0f} MB")
+
+
 
 def read_exact(sock, size):
     data = bytearray()
@@ -108,7 +125,7 @@ def run_worker():
 
                 if step == 1 or step % 10 == 0:
                     print(f"Worker training step {step}/{STEPS}")
-
+    show_gpu_memory("Laptop B")
     print("Laptop B training complete!")
 
 
@@ -183,7 +200,7 @@ def run_controller():
                     f"Step {step:02d}/{STEPS} "
                     f"| Loss: {loss.item():.6f}"
                 )
-
+    show_gpu_memory("Laptop A")
     print("\nDISTRIBUTED ML TRAINING COMPLETED")
 
 
