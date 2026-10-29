@@ -30,3 +30,15 @@ checkpoints/
 uploads/
 data/private/
 
+.dgpu/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+checkpoints/
+*.pt
+*.pth
+*.safetensors
+*.log

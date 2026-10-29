@@ -260,3 +260,8 @@ install_session_auth(app)
 from studio_zoo.api import router as _dgpu_zoo_router
 app.include_router(_dgpu_zoo_router)
 # DGPU_MODEL_ZOO_END
+
+# DGPU_PHASE19_BEGIN
+from studio_multi.api import router as _dgpu_phase19_router
+app.include_router(_dgpu_phase19_router)
+# DGPU_PHASE19_END
