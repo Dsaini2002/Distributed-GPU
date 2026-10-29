@@ -265,3 +265,8 @@ app.include_router(_dgpu_zoo_router)
 from studio_multi.api import router as _dgpu_phase19_router
 app.include_router(_dgpu_phase19_router)
 # DGPU_PHASE19_END
+
+# DGPU_PHASE20_BEGIN
+from studio_pairing.host import router as _dgpu_phase20_router
+app.include_router(_dgpu_phase20_router)
+# DGPU_PHASE20_END

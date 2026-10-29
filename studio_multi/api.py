@@ -164,6 +164,10 @@ pre{background:#0d1522;padding:12px;white-space:pre-wrap;max-height:370px;overfl
 <div class="box"><b id="state">Ready for test</b><pre id="log">Connect worker(s) before starting.</pre></div>
 <script>
 const $=id=>document.getElementById(id);let presets=[],jobId=null;
+/* DGPU_P20_WORKER_PREFILL */
+const p20Workers = new URLSearchParams(location.search).get('workers');
+if(p20Workers && /^[0-9.;:]+$/.test(p20Workers)) $('workers').value=p20Workers;
+
 async function load(){const r=await fetch('/api/distributed-zoo/catalog');const d=await r.json();presets=d.models;const sel=$('model');
 for(const p of presets){const x=document.createElement('option');x.value=p.key;x.textContent=p.family+' · '+p.key;sel.append(x)}
 sel.value='tabular_mlp_regression';update()}
