@@ -1,0 +1,15 @@
+Distributed-GPU Studio — Desktop Beta
+
+This package is for Windows PCs where the Distributed-GPU training backend is already configured. It does NOT install CUDA/PyTorch and cluster services on a fresh PC.
+
+1. Close the app before updating.
+2. Keep Desktop-App/ and Install Distributed-GPU Studio.vbs together.
+3. Double-click Install Distributed-GPU Studio.vbs.
+4. Click Install & Open App. A desktop shortcut is created on supported existing setups.
+5. Host: Cluster > Create Cluster. Worker: Cluster > Join Cluster.
+6. Compare the device fingerprint before approval.
+7. Select a supported model and a suitable dataset in Train Model.
+
+The beta updater does not intentionally rotate existing credentials or erase checkpoints. Reliable automatic reconnect, full fresh-PC installation and security hardening are incomplete.
+
+Full documentation: README.md and docs/PUBLISH_GUIDE.md

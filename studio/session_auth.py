@@ -209,7 +209,16 @@ def install(app):
             return await call_next(request)
 
         # Agent registration already validates its bearer token.
+                # Agent registration validates its own bearer token.
         if path == "/api/heartbeat":
+            return await call_next(request)
+
+        # Phase 20: public pairing entry points.
+        # These endpoints must validate join codes / polling credentials.
+        if path in {
+            "/api/cluster/request",
+            "/api/cluster/poll",
+        }:
             return await call_next(request)
 
         token = os.environ.get("DGPU_TOKEN", "")

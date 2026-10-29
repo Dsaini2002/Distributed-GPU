@@ -1,4 +1,4 @@
-"""Short-lived RSA-OAEP key wrapping for a controller token (never plaintext in HTTP)."""
+﻿"""Short-lived RSA-OAEP key wrapping for a controller token (never plaintext in HTTP)."""
 import base64
 import hashlib
 from cryptography.hazmat.primitives import hashes, serialization
@@ -31,7 +31,7 @@ def parse_public_key(public_b64: str):
 
 def wrap_token(key: rsa.RSAPublicKey, token: str):
     data = token.encode('utf-8')
-    if not (16 <= len(data) <= 160):
+    if not (5 <= len(data) <= 160):
         raise ValueError('Unexpected secret size')
     encrypted = key.encrypt(data, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=b'DGPU-P20'))
     return base64.b64encode(encrypted).decode('ascii')
@@ -40,3 +40,4 @@ def wrap_token(key: rsa.RSAPublicKey, token: str):
 def unwrap_token(private: rsa.RSAPrivateKey, ciphertext: str):
     data = base64.b64decode(ciphertext, validate=True)
     return private.decrypt(data, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=b'DGPU-P20')).decode('utf-8')
+

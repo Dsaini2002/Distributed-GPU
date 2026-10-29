@@ -1,0 +1,37 @@
+name: Build Windows Desktop Beta (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-desktop:
+    name: Build desktop shell on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build portable Windows desktop shell
+        shell: pwsh
+        run: |
+          Set-Location Desktop-App
+          .\Build-Windows.ps1 -Python (Get-Command python).Source
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build beta desktop setup shell
+        shell: pwsh
+        run: |
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $compiler)) { throw 'Inno Setup not installed' }
+          & $compiler '.\Desktop-App\DistributedGPUStudio.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup build failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DistributedGPUStudio-Windows-Desktop-Beta
+          path: Desktop-App/installer-output/*.exe
+          if-no-files-found: error
