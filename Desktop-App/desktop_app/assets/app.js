@@ -11,8 +11,9 @@ async function call(method,...params){if(!window.pywebview||!window.pywebview.ap
 function safeTask(task){return Promise.resolve().then(task).catch(e=>showToast(e.message||String(e),true));}
 function badgeOnline(online){return online?'<span class="dot"></span><span class="device-status">Online</span>':'<span class="dot bad"></span><span class="device-status offline">Offline</span>';}
 function view(name){state.view=name;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(e=>e.classList.toggle('selected',e.dataset.view===name));
- const titles={dashboard:['WORKSPACE OVERVIEW','Your GPU workspace'],cluster:['PAIRING & CONNECTIONS','Cluster manager'],train:['DISTRIBUTED TRAINING','Train a model'],models:['SUPPORTED ARCHITECTURES','Model Zoo'],monitor:['REAL-TIME HARDWARE','GPU monitoring'],history:['SAVED CHECKPOINTS','Training history'],settings:['LOCAL APPLICATION','Settings']};
+ const titles={dashboard:['WORKSPACE OVERVIEW','Your GPU workspace'],cluster:['PAIRING & CONNECTIONS','Cluster manager'],train:['PROJECT COMMANDS & GPU DETAILS','Terminal'],models:['SUPPORTED ARCHITECTURES','Model Zoo'],monitor:['REAL-TIME HARDWARE','GPU monitoring'],history:['SAVED CHECKPOINTS','Training history'],settings:['LOCAL APPLICATION','Settings']};
  $('view-kicker').textContent=titles[name][0];$('view-heading').textContent=titles[name][1];
+ if(name==='train')safeTask(refreshGpuPanel);
  if(name==='cluster')safeTask(refreshPairing);if(name==='train'||name==='models')safeTask(loadCatalog);if(name==='history')safeTask(loadHistory);
  if(name==='settings'){ $('settings-ip').value=state.host; $('settings-root').value=state.root; } }
 function setRoleUI(){const host=state.role==='host';$('cluster-host-tab').classList.toggle('selected',host);$('cluster-worker-tab').classList.toggle('selected',!host);$('host-cluster').classList.toggle('hidden',!host);$('worker-cluster').classList.toggle('hidden',host);$('settings-host').classList.toggle('selected',host);$('settings-worker').classList.toggle('selected',!host);$('join-host').value=state.host;}
@@ -63,7 +64,7 @@ function modelText(m){return `${m.family||''} ${m.key||''} ${m.description||''} 
 function renderModelCards(){const q=$('model-search').value.trim().toLowerCase(),filter=$('model-filter').value;
  const visible=state.models.filter(m=>modelText(m).includes(q)&&(filter==='all'||(filter==='experimental'&&m.experimental)||(m.modes||[]).includes(filter)));
  $('catalog-summary').textContent=`${visible.length} of ${state.models.length} models · ${state.models.filter(m=>(m.modes||[]).includes('multi_gpu')).length} available across multiple GPUs · ${state.models.filter(m=>m.experimental).length} experimental`;
- $('model-cards').innerHTML=visible.map(m=>`<div class="card model-card"><div class="model-icon">◈</div><h3>${escaped(m.family||'AI Model')}</h3><strong>${escaped(m.key)}</strong><div class="model-tags">${(m.modes||[]).map(mode=>`<span class="model-tag">${mode==='multi_gpu'?'Multiple GPUs':'This PC'}</span>`).join('')}${m.experimental?'<span class="model-tag experimental">Experimental · extra setup</span>':''}</div><p class="model-description">${escaped(m.description||'')}</p><p class="dataset-tip">Dataset: ${escaped(m.dataset||'See model documentation')}</p><button class="btn ghost choose-model" data-model="${escaped(m.key)}">Use this model</button></div>`).join('')||'<div class="card placeholder">No models match this filter.</div>';
+ $('model-cards').innerHTML=visible.map(m=>`<div class="card model-card"><div class="model-icon">◈</div><h3>${escaped(m.family||'AI Model')}</h3><strong>${escaped(m.key)}</strong><div class="model-tags">${(m.modes||[]).map(mode=>`<span class="model-tag">${mode==='multi_gpu'?'Multiple GPUs':'This PC'}</span>`).join('')}${m.experimental?'<span class="model-tag experimental">Experimental · extra setup</span>':''}</div><p class="model-description">${escaped(m.description||'')}</p><p class="dataset-tip">Dataset: ${escaped(m.dataset||'See model documentation')}</p><button class="btn ghost choose-model" data-model="${escaped(m.key)}">Open terminal</button></div>`).join('')||'<div class="card placeholder">No models match this filter.</div>';
 }
 async function loadCatalog(force=false){if(state.models.length&&!force)return;try{
  const data=await call('catalog');state.models=data.models||[];state.catalogErrors=data.errors||{};
@@ -121,7 +122,20 @@ async function loadHistory(){try{const jobs=await call('training_history');$('hi
  }catch(e){$('history-list').innerHTML=`<div class="placeholder">${escaped(e.message)}</div>`;}}
 async function saveSettings(){const role=$('settings-worker').classList.contains('selected')?'worker':'host';const d=await call('settings_update',role,$('settings-ip').value.trim(),$('settings-root').value.trim());state.role=d.role;state.host=d.host;state.root=d.root;state.models=[];setRoleUI();showToast('Settings saved');await refreshDashboard();await loadCatalog(true);}
 async function startServices(){const d=await call('start_services');showToast(d.message);}
-function wire(){document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>view(el.dataset.view)));
+let gpuPanelBusy=false;
+function metric(value,unit=''){return value===null||value===undefined?'Unavailable':String(value)+unit;}
+async function refreshGpuPanel(){if(gpuPanelBusy)return;gpuPanelBusy=true;
+ try{const data=await call('cluster_gpu_status');const lines=[];
+ if(data.error)lines.push(data.error,'');
+ for(const node of data.nodes){lines.push(node.name+' | '+node.address,node.error||('Metrics received | '+node.sampled_at));
+ for(const g of node.gpus){lines.push('  GPU '+g.id+': '+g.name,'  Load: '+metric(g.util,'%')+' | Temperature: '+metric(g.temperature,' °C'),'  VRAM used/free/total: '+metric(g.used)+' / '+metric(g.free)+' / '+metric(g.total)+' MiB');}lines.push('');}
+ $('cluster-gpu-console').textContent=lines.join('\n');$('gpu-summary').textContent='Last refresh: '+new Date().toLocaleTimeString();
+ }catch(e){$('cluster-gpu-console').textContent='Metrics unavailable: '+e.message;$('gpu-summary').textContent='Refresh failed';}finally{gpuPanelBusy=false;}}
+function wire(){
+ $('open-native-terminal').onclick=()=>safeTask(async()=>{const d=await call('open_terminal');showToast(d.message);});
+ $('gpu-refresh').onclick=()=>safeTask(refreshGpuPanel);
+ setInterval(()=>{if(state.view==='train')safeTask(refreshGpuPanel);},6000);
+document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>view(el.dataset.view)));
  document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>view(el.dataset.go)));
  $('refresh-button').onclick=()=>safeTask(async()=>{await refreshDashboard();await refreshPairing();});
  document.querySelector('[data-action="create"]').onclick=()=>safeTask(async()=>{view('cluster');if(state.role==='host')await newCode();else showToast('Switch to Host role to create a cluster.');});

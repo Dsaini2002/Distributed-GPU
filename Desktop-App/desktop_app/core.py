@@ -464,6 +464,56 @@ class DesktopBridge:
             return {'cancelled': False, 'path': picked.relative_to(self.root).as_posix()}
         return self.safe(run)
 
+    def open_terminal(self) -> dict:
+        def run():
+            if sys.platform != 'win32':
+                raise RuntimeError('The full terminal requires Windows.')
+            if not self.root:
+                raise RuntimeError('Select your project folder in Settings.')
+            script = self.root / 'studio' / 'GPU-Terminal.ps1'
+            if not script.is_file():
+                raise RuntimeError('Install studio/GPU-Terminal.ps1 in this project first.')
+            exe = Path(os.environ.get('SystemRoot', 'C:/Windows')) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+            # A real visible console is intentional: commands, stdin and Ctrl+C stay native.
+            subprocess.Popen([str(exe), '-NoLogo', '-NoProfile', '-NoExit',
+                              '-File', str(script), '-Root', str(self.root), '-HostIP', self.host,
+                              '-Role', self.role], cwd=str(self.root),
+                             creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
+            return {'message': 'PowerShell launch requested. It runs locally and remains open independently of this app.'}
+        return self.safe(run)
+
+    def cluster_gpu_status(self) -> dict:
+        def run():
+            from .gpu_metrics import gpu_snapshot
+            nodes=[{'name':socket.gethostname(), 'address':'This PC', **gpu_snapshot()}]
+            error=None
+            if self.role == 'host':
+                try:
+                    workers=self._host_api('/api/cluster/workers',authenticated=True).get('workers',[])
+                    token=self._get_token()
+                    from concurrent.futures import ThreadPoolExecutor
+                    def sample(worker):
+                        node={'name':str(worker.get('name','Worker')), 'address':str(worker.get('ip','')), 'gpus':[], 'sampled_at':None, 'error':None}
+                        try:
+                            ip=valid_private_ip(worker['ip'])
+                            if int(worker.get('port',WORKER_PORT)) != WORKER_PORT:
+                                raise ValueError('Unsupported telemetry port')
+                            data=api_json(f'http://{ip}:{WORKER_PORT}/api/p19/gpus',token=token,timeout=4)
+                            if not isinstance(data,dict) or not isinstance(data.get('gpus'),list):
+                                raise ValueError('Invalid telemetry')
+                            node.update(gpus=data['gpus'],sampled_at=data.get('sampled_at'),error=data.get('error'))
+                        except Exception:
+                            node['error']='Metrics unavailable: check worker update, connection and credentials'
+                        return node
+                    with ThreadPoolExecutor(max_workers=4) as pool:
+                        nodes.extend(pool.map(sample,workers[:24]))
+                except Exception:
+                    error='Approved worker list unavailable; check controller and credentials'
+            else:
+                error='Open this panel on the Host to see approved remote GPUs'
+            return {'nodes':nodes,'error':error}
+        return self.safe(run)
+
     def start_services(self) -> dict:
         def run():
             if sys.platform != 'win32':

@@ -93,6 +93,13 @@ def _safe_extract(content: bytes, target: Path):
                         out.write(chunk)
 
 
+@app.get('/api/p19/gpus')
+def gpu_metrics(authorization: str = Header(default='')):
+    _auth(authorization)
+    from .gpu_metrics import gpu_snapshot
+    return gpu_snapshot()
+
+
 @app.get('/api/p19/health')
 def health():
     return {'service': 'phase19', 'version': __version__,
