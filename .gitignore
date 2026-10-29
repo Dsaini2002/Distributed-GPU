@@ -42,3 +42,12 @@ checkpoints/
 *.pth
 *.safetensors
 *.log
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.dgpu/
+.env
+.env.*
+!.env.example
